@@ -1,0 +1,198 @@
+[
+  {
+    "component": "B1",
+    "test": "Validação de schemas e envelopes 6c",
+    "status_without_test": "BLOQUEADO",
+    "interface": "Schemas JSON e validação de mensagens",
+    "observation": "Há schemas JSON versionados para alguns eventos P4, P5, P6 e I5, mas não foi localizada implementação executável do validador/publicador B1; não executar integração até existir runtime."
+  },
+  {
+    "component": "B2",
+    "test": "Callback MQTT simulado: consulta de tempo -> reply UTC correlacionada",
+    "status_without_test": "PENDENTE",
+    "interface": "Serviço de tempo global e resposta correlacionada",
+    "observation": "Teste focalizado aprovado contra origin/develop (6db293d): inscrição no tópico, processamento da consulta e reply UTC correlacionada usando cliente MQTT falso. Checkout permanece em main (baf6c6c); broker real não foi usado e ods.system.time não consta no contrato integracao.txt, então a integração arquitetural continua pendente."
+  },
+  {
+    "component": "B3",
+    "test": "Publicação e consumo pelo barramento",
+    "status_without_test": "BLOQUEADO",
+    "interface": "Transporte de eventos, comandos, consultas e replies",
+    "observation": "Não há diretório ou implementação B3 no workspace para publicar/consumir mensagens; integração pendente de implementação."
+  },
+  {
+    "component": "B4",
+    "test": "Orquestração e relatório dos testes de integração",
+    "status_without_test": "NÃO APLICÁVEL",
+    "interface": "Ferramenta de verificação transversal",
+    "observation": "B4 é a frente que contém e orquestra as suítes por componente; não é um produtor/consumidor de mensagens da arquitetura 6c. Resultados dos componentes são registrados em linhas próprias."
+  },
+  {
+    "component": "B5",
+    "test": "Pacote MODEL e anúncio ods.artifact.published",
+    "status_without_test": "PENDENTE",
+    "interface": "Empacotamento e registro de artefatos versionados",
+    "observation": "Há scripts de empacotamento e um artefato app-epi 1.0.0 com metadados e evento de publicação; validação automatizada ponta a ponta não foi executada nesta atualização."
+  },
+  {
+    "component": "B6",
+    "test": "ZoneEditor, OverlayPlayer, AlertConsole e AppShell",
+    "status_without_test": "PENDENTE",
+    "interface": "Interfaces web de edição, reprodução e operação",
+    "observation": "Há quatro suítes Vitest documentadas no README; os testes de interface não foram executados nesta atualização e não são publicação de eventos pelo barramento."
+  },
+  {
+    "component": "P1",
+    "test": "",
+    "status_without_test": "NÃO APLICÁVEL",
+    "interface": "Não consta na especificação de interfaces 6c",
+    "observation": "P1 não está listado como componente na especificação integracao.txt e não há diretório ou implementação P1 neste workspace."
+  },
+  {
+    "component": "P2",
+    "test": "load/infer/info com pacote MODEL CPU",
+    "status_without_test": "APROVADO",
+    "interface": "Biblioteca: engine_ref + tensor -> inferência e metadados",
+    "observation": "A suíte gera um pacote MODEL ONNX sintético e exercita a compilação CPU e a API pública do P2."
+  },
+  {
+    "component": "P3",
+    "test": "",
+    "status_without_test": "NÃO APLICÁVEL",
+    "interface": "Imagem base do sistema Jetson",
+    "observation": "P3 contém documentação e manifesto de uma imagem de sistema; não é um produtor/consumidor de mensagens nem tem contrato de integração na especificação 6c."
+  },
+  {
+    "component": "P4",
+    "test": "",
+    "status_without_test": "NÃO APLICÁVEL",
+    "interface": "Fonte de vídeo -> stream de frames",
+    "observation": "Não recebe mensagem de componente; requer câmera/GStreamer e a publicação para consumidores ainda está pendente."
+  },
+  {
+    "component": "P5",
+    "test": "",
+    "status_without_test": "NÃO APLICÁVEL",
+    "interface": "Fonte de áudio -> gravação/telemetria",
+    "observation": "Não recebe mensagem de componente nem expõe o contrato de blocos; requer microfone e PyAudio."
+  },
+  {
+    "component": "P6",
+    "test": "Publicador Kafka -> envelope ods.p6.replay.state",
+    "status_without_test": "REPROVADO",
+    "interface": "Comandos de gravação/replay -> replies e estado",
+    "observation": "Teste focalizado executado contra origin/develop (2c7494e) com produtor Kafka falso: o evento é publicado e flush ocorre, mas o envelope falha por ausência de captured_at, source_id e sequence. Checkout permanece em main (8030944); comandos completos de gravação/replay e replies do manual também não foram comprovados."
+  },
+  {
+    "component": "P7",
+    "test": "ods.p7.move.command -> reply e ods.p7.state",
+    "status_without_test": "BLOQUEADO",
+    "interface": "Comando pan/tilt -> estado",
+    "observation": "Teste B4 adicionado; o driver atual controla servos diretamente, sem handler de comando, reply ou evento de estado do contrato 6c."
+  },
+  {
+    "component": "I1",
+    "test": "Fixtures + modelo ONNX -> ods.i1.detections via Docker",
+    "status_without_test": "APROVADO",
+    "interface": "Vídeo/imagens -> ods.i1.detections",
+    "observation": "A suíte B4 executa o detector real em Docker com o modelo ONNX e fixtures locais e valida cada evento emitido contra ods.i1.detections."
+  },
+  {
+    "component": "I2",
+    "test": "CSV de detecções -> ods.i2.tracks",
+    "status_without_test": "REPROVADO",
+    "interface": "CSV por stdin -> evento por quadro em stdout",
+    "observation": "A CLI executa; a saída real usa ods.visao.identidade_atribuida e não corresponde ao envelope/payload de ods.i2.tracks."
+  },
+  {
+    "component": "I3",
+    "test": "Correspondências CSV -> ods.i3.calibration",
+    "status_without_test": "REPROVADO",
+    "interface": "CSV por stdin -> artefato de calibração em stdout",
+    "observation": "A CLI executa; a saída real usa ods.visao.calibracao_publicada e omite campos exigidos por ods.i3.calibration."
+  },
+  {
+    "component": "I4",
+    "test": "Vídeo + checkpoint -> ods.i4.sign",
+    "status_without_test": "REPROVADO",
+    "interface": "Vídeo/frames -> keypoints, sinais e marcadores",
+    "observation": "O pipeline local executa em CPU com vídeo/checkpoint disponíveis, mas a saída local não publica o envelope e os campos de ods.i4.sign."
+  },
+  {
+    "component": "I5",
+    "test": "Áudio local + Whisper tiny -> ods.i5.transcript",
+    "status_without_test": "REPROVADO",
+    "interface": "Áudio -> transcrição",
+    "observation": "Whisper tiny executou em CPU com audio6.ogg e transcreveu áudio real; a saída usa ods.varejo.transcricao e campos legados, divergindo do contrato ods.i5.transcript."
+  },
+  {
+    "component": "I6",
+    "test": "",
+    "status_without_test": "BLOQUEADO",
+    "interface": "Frames -> leitura de código; consulta de qualidade de câmera",
+    "observation": "O fluxo QR exige câmera e broker MQTT; a função local de qualidade não produz diretamente as mensagens do manual."
+  },
+  {
+    "component": "I7",
+    "test": "Imagem local + YOLO/Fast-ALPR -> ods.i7.plate_read",
+    "status_without_test": "REPROVADO",
+    "interface": "Imagem -> leitura de placa",
+    "observation": "YOLO e Fast-ALPR executaram em CPU sobre img_000004.jpg, lendo OVK7900 (confiança OCR 0,969); a implementação salva CSV/mosaicos, sem publicar o evento ods.i7.plate_read."
+  },
+  {
+    "component": "I8",
+    "test": "",
+    "status_without_test": "BLOQUEADO",
+    "interface": "Imagem + artefatos -> ods.i8.piece_analysis",
+    "observation": "O replay depende de modelo, política, taxonomia e manifesto de imagens; esses artefatos não estão disponíveis para um fluxo completo."
+  },
+  {
+    "component": "I9",
+    "test": "ods.i1.detections -> ods.i9.ppe_compliance",
+    "status_without_test": "PENDENTE",
+    "interface": "Frames + detections + calibration -> ods.i9.ppe_compliance",
+    "observation": "I9 tem runtime e fixture local; teste B4 de execução real e validação de contrato adicionado, mas não executado nesta atualização a pedido."
+  },
+  {
+    "component": "S1",
+    "test": "ods.i2.tracks + session -> ods.s1.*",
+    "status_without_test": "APROVADO",
+    "interface": "Eventos JSON -> position, zone_transition e zone_occupancy",
+    "observation": "Execução local pelo simulador, sem Kafka."
+  },
+  {
+    "component": "S2",
+    "test": "Entrada normalizada -> ods.s2.entity",
+    "status_without_test": "REPROVADO",
+    "interface": "Lista de eventos normalizados -> eventos consolidados",
+    "observation": "A função local executa; gera ods.visao.evento_canonico sem o envelope/payload de ods.s2.entity."
+  },
+  {
+    "component": "S3",
+    "test": "ods.s3.alert.command -> ods.s3.alert.reply",
+    "status_without_test": "APROVADO",
+    "interface": "Comando JSON -> reply correlacionada",
+    "observation": "Executa o processador real com repositório em memória, sem broker; suíte documentada executada: 375 aprovados e 163 subtestes aprovados."
+  },
+  {
+    "component": "S4",
+    "test": "",
+    "status_without_test": "BLOQUEADO",
+    "interface": "Streams/eventos -> clipe e replies",
+    "observation": "Serviço C++ requer CMake, toolchain C++20 e GStreamer; esses executáveis não estão disponíveis neste Windows."
+  },
+  {
+    "component": "S5",
+    "test": "ods.s1.zone_occupancy -> ods.s5.zone_metrics -> metrics.reply",
+    "status_without_test": "APROVADO",
+    "interface": "Eventos e consulta no barramento em memória",
+    "observation": "Usa DuckDB e barramento em memória, sem Kafka; suíte documentada executada: 242 aprovados e 1 ignorado."
+  },
+  {
+    "component": "S6",
+    "test": "ods.s6.synthesis.command -> reply",
+    "status_without_test": "BLOQUEADO",
+    "interface": "ods.s6.synthesis.command -> reply",
+    "observation": "Teste B4 de síntese adicionado; bloqueado porque não existe diretório nem implementação S6 no workspace."
+  }
+]
