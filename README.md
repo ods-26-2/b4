@@ -1,7 +1,7 @@
 ## B4 — Testes de integração (TRA-2)
 
 Este repositório contém testes de integração orientados aos contratos da
-Especificação de interfaces 1.0 em [../integracao.txt](../integracao.txt). Cada suíte fica em
+Especificação de interfaces 1.0. Cada suíte fica em
 `tests/integration/<componente>/`; os testes enviam entradas aos pontos de
 execução reais disponíveis no workspace e validam as saídas com
 `tests/integration/contract_validation.py`.
