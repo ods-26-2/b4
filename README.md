@@ -49,6 +49,11 @@ identificam divergências entre a implementação de cada repositório e o manua
 P2 gera um pacote MODEL ONNX temporário e testa a compilação CPU e a inferência
 pela API pública; para executá-lo, instale `p2[cpu]` e `pytest` no ambiente
 Python usado pelo executor.
+S4 foi validado em Docker Debian: os 15 testes CTest passaram e o smoke E2E
+com vídeo real validou replay, buffer, API HTTP, decodificação H.264 e hashes
+repetíveis. O Dockerfile oferece todas as bibliotecas necessárias; no Windows,
+o script smoke precisou ser normalizado temporariamente de CRLF para LF porque
+o shebang com CRLF não é executável no Linux.
 I4 também tem um fluxo offline com vídeo e checkpoint locais; a suíte valida a
 saída real contra o evento `ods.i4.sign` do manual, sem simular publicação no
 barramento.

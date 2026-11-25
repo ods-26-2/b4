@@ -95,7 +95,7 @@
     "test": "Fixtures + modelo ONNX -> ods.i1.detections via Docker",
     "status_without_test": "APROVADO",
     "interface": "Vídeo/imagens -> ods.i1.detections",
-    "observation": "A suíte B4 executa o detector real em Docker com o modelo ONNX e fixtures locais e valida cada evento emitido contra ods.i1.detections."
+    "observation": "Reexecutado em 2026-11-04 após atualizar a branch main do I1 para origin/main (54a99ed): inferência ONNX real no Docker com fixtures locais; eventos JSONL validados pelo contrato ods.i1.detections. Teste B4 aprovado."
   },
   {
     "component": "I2",
@@ -149,9 +149,9 @@
   {
     "component": "I9",
     "test": "ods.i1.detections -> ods.i9.ppe_compliance",
-    "status_without_test": "PENDENTE",
+    "status_without_test": "REPROVADO",
     "interface": "Frames + detections + calibration -> ods.i9.ppe_compliance",
-    "observation": "I9 tem runtime e fixture local; teste B4 de execução real e validação de contrato adicionado, mas não executado nesta atualização a pedido."
+    "observation": "Reexecutado em 2026-11-18 na revisão I9 8ae3933 com runtime e fixture local: falha no contrato ods.i9.ppe_compliance pela ausência dos campos detection_id, bbox, calibrated e items."
   },
   {
     "component": "S1",
@@ -176,10 +176,10 @@
   },
   {
     "component": "S4",
-    "test": "",
-    "status_without_test": "BLOQUEADO",
+    "test": "Build Docker, CTest e smoke E2E com vídeo",
+    "status_without_test": "APROVADO",
     "interface": "Streams/eventos -> clipe e replies",
-    "observation": "Serviço C++ requer CMake, toolchain C++20 e GStreamer; esses executáveis não estão disponíveis neste Windows."
+    "observation": "Executado em Docker em 2026-11-04: 15/15 testes CTest aprovados. Smoke E2E também aprovado: replay de MP4, 2671 quadros, API HTTP, extração/decodificação H.264, POST 201, hash publicado igual ao arquivo e hash repetível (a6dacf4364180d06...). O alvo smoke padrão falha porque scripts/smoke_e2e.sh tem CRLF; o mesmo script foi executado com cópia LF temporária, sem alterar o repositório."
   },
   {
     "component": "S5",
