@@ -8,10 +8,9 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent
-WORKSPACE_ROOT = ROOT.parent
 TEST_ROOT = ROOT / "tests" / "integration"
 MATRIX_PATH = TEST_ROOT / "component_matrix.json"
-REPORT_PATH = WORKSPACE_ROOT / "relatorio_integracao.csv"
+REPORT_PATH = ROOT / "results" / "relatorio_integracao.csv"
 
 
 class IntegrationResult(unittest.TextTestResult):
@@ -61,6 +60,7 @@ class IntegrationResult(unittest.TextTestResult):
 def _write_report(records: list[dict[str, str]]) -> None:
     with MATRIX_PATH.open(encoding="utf-8") as source:
         matrix = json.load(source)
+    REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     by_component: dict[str, list[dict[str, str]]] = {}
     for record in records:
         by_component.setdefault(record["component"], []).append(record)
@@ -121,6 +121,11 @@ def main() -> int:
             )
         )
     suite.addTests(unittest.defaultTestLoader.loadTestsFromName("tests.integration.test_kafka_client"))
+    suite.addTests(
+        unittest.defaultTestLoader.loadTestsFromName(
+            "tests.integration.test_run_integration"
+        )
+    )
     runner = unittest.TextTestRunner(verbosity=2, resultclass=IntegrationResult)
     result = runner.run(suite)
     _write_report(result.records)
