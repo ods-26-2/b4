@@ -1,58 +1,74 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-import subprocess
-import sys
 import unittest
 import uuid
 
 from tests.integration.contract_validation import validate_message
-
-
-WORKSPACE_ROOT = Path(__file__).resolve().parents[4]
-COMPONENT_ROOT = WORKSPACE_ROOT / "i2"
+from tests.integration.kafka_client import (
+    KafkaIntegrationError,
+    kafka_configured,
+    new_event,
+    publish_and_wait,
+)
 
 
 class I2IntegrationTests(unittest.TestCase):
-    def test_csv_detections_produce_contract_tracks(self):
+    def test_i1_detections_on_kafka_produce_i2_tracks(self):
+        if not kafka_configured():
+            self.skipTest("Defina ODS_KAFKA_BOOTSTRAP_SERVERS para o broker Kafka de testes.")
+
         session_id = str(uuid.uuid4())
-        csv_input = (
-            "quadro,t_s,x1,y1,x2,y2,classe,confianca\n"
-            "0,0.0,10,10,50,100,pessoa,0.9\n"
-            "1,0.1,11,10,51,100,pessoa,0.9\n"
-            "2,0.2,12,10,52,100,pessoa,0.9\n"
-            "3,0.3,13,10,53,100,pessoa,0.9\n"
+        source_id = f"b4-test-{uuid.uuid4().hex[:8]}"
+        detections = new_event(
+            "ods.i1.detections",
+            "I1",
+            source_id,
+            session_id,
+            0,
+            "b4-test-model",
+            {
+                "frame_index": 0,
+                "image_width": 640,
+                "image_height": 480,
+                "detections": [
+                    {
+                        "detection_id": 0,
+                        "class": "person",
+                        "confidence": 0.99,
+                        "bbox": [100, 40, 240, 450],
+                    }
+                ],
+            },
         )
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(COMPONENT_ROOT / "main.py"),
-                "--camera-id",
-                "cam0",
-                "--sessao",
-                session_id,
-                "--inicio",
-                "2026-09-23T14:29:59.000Z",
-            ],
-            cwd=COMPONENT_ROOT,
-            input=csv_input,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        if result.returncode and "ModuleNotFoundError: No module named" in result.stderr:
-            self.skipTest(result.stderr.strip().splitlines()[-1])
-        self.assertEqual(result.returncode, 0, result.stderr)
-        messages = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
-        self.assertGreaterEqual(len(messages), 1, result.stdout)
+
+        try:
+            tracks = publish_and_wait(
+                "ods.i1.detections",
+                detections,
+                "ods.i2.tracks",
+                lambda message: (
+                    message.get("schema") == "ods.i2.tracks"
+                    and message.get("source_id") == source_id
+                    and message.get("session_id") == session_id
+                    and isinstance(message.get("payload"), dict)
+                    and message["payload"].get("frame_index") == 0
+                ),
+            )
+        except KafkaIntegrationError as error:
+            self.fail(str(error))
+
         errors = validate_message(
-            messages[-1],
+            tracks,
             schema="ods.i2.tracks",
             message_type="event",
             producer="I2",
             payload_fields=("frame_index", "tracks"),
-            context_fields=("captured_at", "source_id", "session_id", "sequence", "artifact_version"),
+            context_fields=(
+                "captured_at",
+                "source_id",
+                "session_id",
+                "sequence",
+                "artifact_version",
+            ),
         )
-        if errors:
-            self.fail(f"I2 diverge de ods.i2.tracks: {'; '.join(errors)}")
+        self.assertFalse(errors, f"Evento I2 inválido: {'; '.join(errors)}")

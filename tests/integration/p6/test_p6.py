@@ -1,116 +1,52 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-import subprocess
-import sys
-import types
 import unittest
 import uuid
-from unittest.mock import patch
 
 from tests.integration.contract_validation import validate_message
-
-
-WORKSPACE_ROOT = Path(__file__).resolve().parents[4]
-COMPONENT_ROOT = WORKSPACE_ROOT / "p6"
-
-
-class FakeProducer:
-    def __init__(self) -> None:
-        self.messages: list[dict[str, object]] = []
-        self.flush_count = 0
-
-    def produce(self, **message: object) -> None:
-        self.messages.append(message)
-
-    def flush(self) -> None:
-        self.flush_count += 1
+from tests.integration.kafka_client import (
+    KafkaIntegrationError,
+    kafka_configured,
+    new_request,
+    publish_and_wait,
+)
 
 
 class P6IntegrationTests(unittest.TestCase):
-    def test_replay_state_publisher_matches_manual_event_envelope(self):
-        source = subprocess.run(
-            ["git", "show", "origin/develop:kafka_client.py"],
-            cwd=COMPONENT_ROOT,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-        if source.returncode:
-            self.skipTest(
-                "P6 kafka_client.py ausente no checkout e origin/develop indisponível."
-            )
+    def test_replay_command_on_kafka_returns_correlated_error_for_missing_recording(self):
+        if not kafka_configured():
+            self.skipTest("Defina ODS_KAFKA_BOOTSTRAP_SERVERS para o broker Kafka de testes.")
 
-        fake_kafka = types.ModuleType("confluent_kafka")
-        fake_kafka.Producer = object
-        fake_kafka.Consumer = object
-        module_globals = {"__name__": "p6_kafka_client_under_test"}
-        with patch.dict(sys.modules, {"confluent_kafka": fake_kafka}):
-            exec(
-                compile(source.stdout, "origin/develop:kafka_client.py", "exec"),
-                module_globals,
-            )
-
-        producer = FakeProducer()
-        session_id = str(uuid.uuid4())
-        module_globals["enviar_evento_ods"](
-            producer,
-            "ods.p6.replay.state",
-            "ods.p6.replay.state",
-            session_id,
+        recording_id = f"b4-missing-{uuid.uuid4()}"
+        command = new_request(
+            "ods.p6.replay.command",
+            "command",
+            "B4",
+            "P6",
             {
-                "recording_id": "rec-b4",
-                "state": "PLAYING",
-                "position_ms": 1000,
-                "duration_ms": 5000,
-                "speed_factor": 1.0,
-                "loop": False,
+                "action": "SEEK",
+                "recording_id": recording_id,
+                "position_ms": 1,
             },
         )
+        try:
+            reply = publish_and_wait(
+                "ods.p6.replay.command",
+                command,
+                "ods.p6.replay.reply",
+                lambda message: message.get("correlation_id") == command["message_id"],
+            )
+        except KafkaIntegrationError as error:
+            self.fail(str(error))
 
-        self.assertEqual(len(producer.messages), 1)
-        self.assertEqual(producer.flush_count, 1)
-        message = json.loads(producer.messages[0]["value"].decode("utf-8"))
         errors = validate_message(
-            message,
-            schema="ods.p6.replay.state",
-            message_type="event",
+            reply,
+            schema="ods.p6.replay.reply",
+            message_type="reply",
             producer="P6",
-            payload_fields=(
-                "recording_id",
-                "state",
-                "position_ms",
-                "duration_ms",
-                "speed_factor",
-                "loop",
-            ),
-            context_fields=("captured_at", "source_id", "session_id", "sequence"),
+            payload_fields=("status",),
+            context_fields=("correlation_id",),
         )
-        self.assertFalse(errors, f"Publicação P6 diverge do manual 6c: {'; '.join(errors)}")
-
-    def test_record_command_returns_contract_reply(self):
-        executable_sources = list(COMPONENT_ROOT.rglob("*.py")) if COMPONENT_ROOT.is_dir() else []
-        if not executable_sources:
-            self.skipTest(
-                "P6 ainda não tem implementação executável para receber "
-                "ods.p6.record.command e produzir reply."
-            )
-        self.skipTest(
-            "P6 ainda não expõe um handler identificável para "
-            "ods.p6.record.command; conectar o teste ao runtime ao implementá-lo."
-        )
-
-    def test_replay_command_returns_state_and_session(self):
-        executable_sources = list(COMPONENT_ROOT.rglob("*.py")) if COMPONENT_ROOT.is_dir() else []
-        if not executable_sources:
-            self.skipTest(
-                "P6 ainda não tem implementação executável para receber "
-                "ods.p6.replay.command e produzir reply/state."
-            )
-        self.skipTest(
-            "P6 ainda não expõe um handler identificável para "
-            "ods.p6.replay.command; conectar o teste ao runtime ao implementá-lo."
-        )
+        self.assertFalse(errors, f"Reply P6 inválida: {'; '.join(errors)}")
+        self.assertEqual(reply["payload"]["status"], "ERROR")
+        self.assertEqual(reply["payload"]["error"]["code"], "RECORDING_NOT_FOUND")

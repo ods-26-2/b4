@@ -1,50 +1,52 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-import sys
 import unittest
-import uuid
 
 from tests.integration.contract_validation import validate_message
-
-
-WORKSPACE_ROOT = Path(__file__).resolve().parents[4]
-COMPONENT_ROOT = WORKSPACE_ROOT / "s3"
-sys.path.insert(0, str(COMPONENT_ROOT / "src"))
-
-from s3.commands import ProcessadorComandos
-from s3.service import AlertService
+from tests.integration.kafka_client import (
+    KafkaIntegrationError,
+    kafka_configured,
+    new_request,
+    publish_and_wait,
+)
 
 
 class S3IntegrationTests(unittest.TestCase):
-    def test_valid_alert_command_returns_contract_reply(self):
-        message_id = str(uuid.uuid4())
-        command = {
-            "message_type": "command",
-            "message_id": message_id,
-            "schema": "ods.s3.alert.command",
-            "schema_version": "1.0",
-            "producer": "A5",
-            "published_at": "2026-09-23T14:31:00.000Z",
-            "target": "S3",
-            "payload": {
-                "title": "Acesso negado",
-                "message": "Crachá de teste recusado na portaria",
+    def test_invalid_alert_command_on_kafka_returns_correlated_error(self):
+        if not kafka_configured():
+            self.skipTest("Defina ODS_KAFKA_BOOTSTRAP_SERVERS para o broker Kafka de testes.")
+
+        command = new_request(
+            "ods.s3.alert.command",
+            "command",
+            "A5",
+            "S3",
+            {
+                "title": "B4 integration test",
+                "message": "Invalid channel test; no alert should be created.",
                 "severity": "MEDIUM",
                 "recipients": ["group:portaria"],
-                "channels": ["SCREEN"],
+                "channels": ["B4_INVALID_CHANNEL"],
             },
-        }
-        reply = json.loads(ProcessadorComandos(AlertService()).receber(json.dumps(command)))
+        )
+        try:
+            reply = publish_and_wait(
+                "ods.s3.alert.command",
+                command,
+                "ods.s3.alert.reply",
+                lambda message: message.get("correlation_id") == command["message_id"],
+            )
+        except KafkaIntegrationError as error:
+            self.fail(str(error))
+
         errors = validate_message(
             reply,
             schema="ods.s3.alert.reply",
             message_type="reply",
             producer="S3",
-            payload_fields=("status", "alert_id"),
+            payload_fields=("status", "error"),
             context_fields=("correlation_id",),
         )
-        self.assertFalse(errors, f"Reply do S3 inválida: {'; '.join(errors)}")
-        self.assertEqual(reply["correlation_id"], message_id)
-        self.assertEqual(reply["payload"]["status"], "OK")
+        self.assertFalse(errors, f"Reply S3 inválida: {'; '.join(errors)}")
+        self.assertEqual(reply["payload"]["status"], "ERROR")
+        self.assertEqual(reply["payload"]["error"]["code"], "INVALID_CHANNEL")
