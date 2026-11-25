@@ -9,9 +9,9 @@
   {
     "component": "B2",
     "test": "Callback MQTT simulado: consulta de tempo -> reply UTC correlacionada",
-    "status_without_test": "PENDENTE",
+    "status_without_test": "BLOQUEADO",
     "interface": "Serviço de tempo global e resposta correlacionada",
-    "observation": "Teste focalizado aprovado contra origin/develop (6db293d): inscrição no tópico, processamento da consulta e reply UTC correlacionada usando cliente MQTT falso. Checkout permanece em main (baf6c6c); broker real não foi usado e ods.system.time não consta no contrato integracao.txt, então a integração arquitetural continua pendente."
+    "observation": "B2 usa MQTT e o schema ods.system.time não consta nos contratos Kafka 6c; não há fluxo B4 acionável pelo barramento Kafka comum."
   },
   {
     "component": "B3",
@@ -51,9 +51,9 @@
   {
     "component": "P2",
     "test": "load/infer/info com pacote MODEL CPU",
-    "status_without_test": "APROVADO",
+    "status_without_test": "NÃO APLICÁVEL",
     "interface": "Biblioteca: engine_ref + tensor -> inferência e metadados",
-    "observation": "A suíte gera um pacote MODEL ONNX sintético e exercita a compilação CPU e a API pública do P2."
+    "observation": "P2 é uma biblioteca, não um consumidor de mensagens Kafka; sua API não é acionável pelo barramento comum."
   },
   {
     "component": "P3",
@@ -78,66 +78,66 @@
   },
   {
     "component": "P6",
-    "test": "Publicador Kafka -> envelope ods.p6.replay.state",
-    "status_without_test": "REPROVADO",
+    "test": "ods.p6.replay.command -> reply correlacionada",
+    "status_without_test": "PENDENTE",
     "interface": "Comandos de gravação/replay -> replies e estado",
-    "observation": "Teste focalizado executado contra origin/develop (2c7494e) com produtor Kafka falso: o evento é publicado e flush ocorre, mas o envelope falha por ausência de captured_at, source_id e sequence. Checkout permanece em main (8030944); comandos completos de gravação/replay e replies do manual também não foram comprovados."
+    "observation": "A suíte publica SEEK para uma gravação inexistente e valida a reply de erro correlacionada, sem iniciar gravação ou reprodução."
   },
   {
     "component": "P7",
-    "test": "ods.p7.move.command -> reply e ods.p7.state",
-    "status_without_test": "BLOQUEADO",
-    "interface": "Comando pan/tilt -> estado",
-    "observation": "Teste B4 adicionado; o driver atual controla servos diretamente, sem handler de comando, reply ou evento de estado do contrato 6c."
+    "test": "ods.p7.move.command fora do limite -> reply de erro",
+    "status_without_test": "PENDENTE",
+    "interface": "Comando Kafka pan/tilt -> reply",
+    "observation": "O teste envia tilt_deg fora do limite do contrato e valida OUT_OF_RANGE, uma resposta que não movimenta o atuador."
   },
   {
     "component": "I1",
     "test": "Fixtures + modelo ONNX -> ods.i1.detections via Docker",
-    "status_without_test": "APROVADO",
+    "status_without_test": "BLOQUEADO",
     "interface": "Vídeo/imagens -> ods.i1.detections",
-    "observation": "Reexecutado em 2026-11-04 após atualizar a branch main do I1 para origin/main (54a99ed): inferência ONNX real no Docker com fixtures locais; eventos JSONL validados pelo contrato ods.i1.detections. Teste B4 aprovado."
+    "observation": "I1 é acionado por frames de vídeo/stream, que não são comandos Kafka na 6c; a suíte B4 não inicia o runtime local nem injeta mídia."
   },
   {
     "component": "I2",
-    "test": "CSV de detecções -> ods.i2.tracks",
-    "status_without_test": "REPROVADO",
-    "interface": "CSV por stdin -> evento por quadro em stdout",
-    "observation": "A CLI executa; a saída real usa ods.visao.identidade_atribuida e não corresponde ao envelope/payload de ods.i2.tracks."
+    "test": "ods.i1.detections -> ods.i2.tracks no Kafka",
+    "status_without_test": "PENDENTE",
+    "interface": "Evento de detecção -> evento de rastros",
+    "observation": "O teste publica um quadro sintético no tópico de entrada e valida a mensagem I2 correspondente no tópico ods.i2.tracks."
   },
   {
     "component": "I3",
-    "test": "Correspondências CSV -> ods.i3.calibration",
-    "status_without_test": "REPROVADO",
-    "interface": "CSV por stdin -> artefato de calibração em stdout",
-    "observation": "A CLI executa; a saída real usa ods.visao.calibracao_publicada e omite campos exigidos por ods.i3.calibration."
+    "test": "Publicação ods.i3.calibration",
+    "status_without_test": "BLOQUEADO",
+    "interface": "Publicação de evento de calibração",
+    "observation": "A 6c define I3 como produtor de ods.i3.calibration, mas não define um comando Kafka para iniciar a calibração remotamente."
   },
   {
     "component": "I4",
     "test": "Vídeo + checkpoint -> ods.i4.sign",
-    "status_without_test": "REPROVADO",
+    "status_without_test": "BLOQUEADO",
     "interface": "Vídeo/frames -> keypoints, sinais e marcadores",
-    "observation": "O pipeline local executa em CPU com vídeo/checkpoint disponíveis, mas a saída local não publica o envelope e os campos de ods.i4.sign."
+    "observation": "I4 consome frames de vídeo/stream; a 6c não define comando Kafka para enviar mídia. A captura de léxico por comando também está fora do escopo atual do I4."
   },
   {
     "component": "I5",
     "test": "Áudio local + Whisper tiny -> ods.i5.transcript",
-    "status_without_test": "REPROVADO",
+    "status_without_test": "BLOQUEADO",
     "interface": "Áudio -> transcrição",
-    "observation": "Whisper tiny executou em CPU com audio6.ogg e transcreveu áudio real; a saída usa ods.varejo.transcricao e campos legados, divergindo do contrato ods.i5.transcript."
+    "observation": "I5 é acionado por áudio/stream, que não é comando Kafka na 6c; a suíte B4 não inicia inferência local nem injeta mídia."
   },
   {
     "component": "I6",
     "test": "",
     "status_without_test": "BLOQUEADO",
     "interface": "Frames -> leitura de código; consulta de qualidade de câmera",
-    "observation": "O fluxo QR exige câmera e broker MQTT; a função local de qualidade não produz diretamente as mensagens do manual."
+    "observation": "O fluxo de leitura depende de frames/câmera e a implementação I6 no workspace não expõe o handler Kafka da consulta camera_quality."
   },
   {
     "component": "I7",
     "test": "Imagem local + YOLO/Fast-ALPR -> ods.i7.plate_read",
-    "status_without_test": "REPROVADO",
+    "status_without_test": "BLOQUEADO",
     "interface": "Imagem -> leitura de placa",
-    "observation": "YOLO e Fast-ALPR executaram em CPU sobre img_000004.jpg, lendo OVK7900 (confiança OCR 0,969); a implementação salva CSV/mosaicos, sem publicar o evento ods.i7.plate_read."
+    "observation": "I7 é acionado por imagens/vídeo; a 6c não define comando Kafka para enviar mídia. A suíte B4 não inicia inferência local nem injeta imagens."
   },
   {
     "component": "I8",
@@ -148,51 +148,51 @@
   },
   {
     "component": "I9",
-    "test": "ods.i1.detections -> ods.i9.ppe_compliance",
-    "status_without_test": "REPROVADO",
-    "interface": "Frames + detections + calibration -> ods.i9.ppe_compliance",
-    "observation": "Reexecutado em 2026-11-18 na revisão I9 8ae3933 com runtime e fixture local: falha no contrato ods.i9.ppe_compliance pela ausência dos campos detection_id, bbox, calibrated e items."
+    "test": "ods.i1.detections -> ods.i9.ppe_compliance no Kafka",
+    "status_without_test": "PENDENTE",
+    "interface": "Evento de detecção -> evento de conformidade",
+    "observation": "O teste publica uma detecção sintética por Kafka e valida a saída I9 correspondente, incluindo envelope e campos obrigatórios do contrato."
   },
   {
     "component": "S1",
-    "test": "ods.i2.tracks + session -> ods.s1.*",
-    "status_without_test": "APROVADO",
-    "interface": "Eventos JSON -> position, zone_transition e zone_occupancy",
-    "observation": "Execução local pelo simulador, sem Kafka."
+    "test": "ods.i2.tracks -> ods.s1.position no Kafka",
+    "status_without_test": "PENDENTE",
+    "interface": "Evento de rastros -> evento de posições",
+    "observation": "O teste publica um quadro sintético sem rastros e valida a posição correspondente; exige ODS_TEST_SOURCE_ID de teste cadastrado no ZONES do S1."
   },
   {
     "component": "S2",
-    "test": "Entrada normalizada -> ods.s2.entity",
-    "status_without_test": "REPROVADO",
-    "interface": "Lista de eventos normalizados -> eventos consolidados",
-    "observation": "A função local executa; gera ods.visao.evento_canonico sem o envelope/payload de ods.s2.entity."
+    "test": "ods.s2.rules.command -> reply correlacionada",
+    "status_without_test": "PENDENTE",
+    "interface": "Comando de regras -> reply",
+    "observation": "O teste envia uma regra de event_type inválido e verifica a reply de erro correlacionada, sem aplicar alteração de regras."
   },
   {
     "component": "S3",
-    "test": "ods.s3.alert.command -> ods.s3.alert.reply",
-    "status_without_test": "APROVADO",
-    "interface": "Comando JSON -> reply correlacionada",
-    "observation": "Executa o processador real com repositório em memória, sem broker; suíte documentada executada: 375 aprovados e 163 subtestes aprovados."
+    "test": "ods.s3.alert.command -> reply correlacionada",
+    "status_without_test": "PENDENTE",
+    "interface": "Comando Kafka -> reply",
+    "observation": "O teste envia um comando com canal inválido e verifica o erro correlacionado, sem criar um alerta."
   },
   {
     "component": "S4",
-    "test": "Build Docker, CTest e smoke E2E com vídeo",
-    "status_without_test": "APROVADO",
-    "interface": "Streams/eventos -> clipe e replies",
-    "observation": "Executado em Docker em 2026-11-04: 15/15 testes CTest aprovados. Smoke E2E também aprovado: replay de MP4, 2671 quadros, API HTTP, extração/decodificação H.264, POST 201, hash publicado igual ao arquivo e hash repetível (a6dacf4364180d06...). O alvo smoke padrão falha porque scripts/smoke_e2e.sh tem CRLF; o mesmo script foi executado com cópia LF temporária, sem alterar o repositório."
+    "test": "ods.s4.clip.query -> reply correlacionada",
+    "status_without_test": "PENDENTE",
+    "interface": "Consulta Kafka de clipe -> reply",
+    "observation": "O teste consulta um clip_id inexistente e valida uma resposta vazia, sem iniciar captura."
   },
   {
     "component": "S5",
-    "test": "ods.s1.zone_occupancy -> ods.s5.zone_metrics -> metrics.reply",
-    "status_without_test": "APROVADO",
-    "interface": "Eventos e consulta no barramento em memória",
-    "observation": "Usa DuckDB e barramento em memória, sem Kafka; suíte documentada executada: 242 aprovados e 1 ignorado."
+    "test": "ods.s5.metrics.query -> reply correlacionada",
+    "status_without_test": "PENDENTE",
+    "interface": "Consulta Kafka de métricas -> reply",
+    "observation": "O teste envia uma consulta de série histórica e valida envelope, status, série e correlation_id da resposta."
   },
   {
     "component": "S6",
-    "test": "ods.s6.synthesis.command -> reply",
-    "status_without_test": "BLOQUEADO",
+    "test": "ods.s6.synthesis.command -> reply correlacionada",
+    "status_without_test": "PENDENTE",
     "interface": "ods.s6.synthesis.command -> reply",
-    "observation": "Teste B4 de síntese adicionado; bloqueado porque não existe diretório nem implementação S6 no workspace."
+    "observation": "O teste solicita um lexicon_version inexistente e valida erro correlacionado, sem iniciar síntese."
   }
 ]

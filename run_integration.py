@@ -97,11 +97,30 @@ def _write_report(records: list[dict[str, str]]) -> None:
 
 
 def main() -> int:
-    suite = unittest.defaultTestLoader.discover(
-        str(TEST_ROOT),
-        pattern="test_*.py",
-        top_level_dir=str(ROOT),
+    kafka_components = (
+        "b2",
+        "i2",
+        "i3",
+        "i9",
+        "p6",
+        "p7",
+        "s1",
+        "s2",
+        "s3",
+        "s4",
+        "s5",
+        "s6",
     )
+    suite = unittest.TestSuite()
+    for component in kafka_components:
+        suite.addTests(
+            unittest.defaultTestLoader.discover(
+                str(TEST_ROOT / component),
+                pattern="test_*.py",
+                top_level_dir=str(ROOT),
+            )
+        )
+    suite.addTests(unittest.defaultTestLoader.loadTestsFromName("tests.integration.test_kafka_client"))
     runner = unittest.TextTestRunner(verbosity=2, resultclass=IntegrationResult)
     result = runner.run(suite)
     _write_report(result.records)

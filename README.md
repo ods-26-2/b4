@@ -1,72 +1,61 @@
 ## B4 — Testes de integração (TRA-2)
 
-Este repositório contém testes de integração orientados aos contratos da
-Especificação de interfaces 1.0. Cada suíte fica em
-`tests/integration/<componente>/`; os testes enviam entradas aos pontos de
-execução reais disponíveis no workspace e validam as saídas com
-`tests/integration/contract_validation.py`.
+As suítes Kafka desta pasta atuam como produtores de teste: publicam mensagens nos
+tópicos de entrada da especificação 6c e consomem as respostas/eventos dos
+componentes implantados. A validação dos envelopes e payloads é feita localmente
+por `tests/integration/contract_validation.py`; os componentes não são iniciados
+nem importados pelo executor de integração.
 
 ### Executar
 
-No PowerShell, na raiz deste repositório:
+Instale o cliente Kafka e configure o endereço do broker de testes:
 
 ```powershell
+python -m pip install -r requirements.txt
+$env:ODS_KAFKA_BOOTSTRAP_SERVERS = "<host:porta>"
+$env:ODS_TEST_SOURCE_ID = "<source_id de teste cadastrado no ZONES do S1>"
 python run_integration.py
 ```
 
-O comando executa todas as suítes aplicáveis e atualiza
-`..\relatorio_integracao.csv`, planilha CSV com separador `;` e BOM UTF-8,
-compatível com Excel. Um componente que não tem código, não recebe entradas,
-não produz saídas ou depende de hardware/modelos/brokers indisponíveis aparece
-com o estado e a justificativa no relatório; esses casos não são contabilizados
-como aprovados. P1 e P3 também aparecem no relatório como não aplicáveis: P1
-não consta na especificação 6c nem tem implementação neste workspace, e P3 é
-uma imagem base de sistema sem interface de mensagens descrita no manual.
-P7 e S6 têm contratos de mensagem definidos, mas não oferecem a implementação
-compatível necessária para executar os fluxos; seus testes B4 foram criados e
-registram esses bloqueios. B2 e P6 têm atualizações disponíveis nas referências
-locais `origin/develop`, mas os checkouts de trabalho permanecem em `main`.
-O callback MQTT de B2 foi testado isoladamente com cliente falso e produziu
-reply UTC correlacionada; broker real e compatibilidade com o contrato 6c
-permanecem pendentes. O publicador de replay de P6 foi testado isoladamente
-com produtor Kafka falso e reprovou por ausência de campos obrigatórios do
-envelope; handlers de gravação/replay ainda não foram comprovados. I9 possui implementação e fixture,
-e sua suíte B4 foi adicionada; a execução dela está pendente nesta atualização
-para respeitar o pedido de não repetir os testes.
-As frentes transversais B1–B6 também são listadas no relatório: B1–B3 estão
-bloqueadas pela falta de runtimes testáveis, B5 e B6 têm validações pendentes
-que não foram executadas, e B4 é identificada como a ferramenta de verificação,
-não como um componente produtor/consumidor da arquitetura.
+Para Kafka gerenciado com SASL/TLS, configure as variáveis comuns usadas pela
+arquitetura:
 
-Instale previamente as dependências de cada componente conforme o seu README.
-Quando a dependência de runtime estiver ausente, a suíte registra o teste como
-`BLOQUEADO` em vez de confundir a falta de ambiente com falha contratual.
+```powershell
+$env:KAFKA_SECURITY_PROTOCOL = "SASL_SSL"
+$env:KAFKA_SASL_MECHANISM = "PLAIN"
+$env:KAFKA_SASL_USERNAME = "<usuario>"
+$env:KAFKA_SASL_PASSWORD = "<senha>"
+# Opcional, se o broker exigir uma CA específica:
+$env:KAFKA_SSL_CA_LOCATION = "C:\certs\kafka-ca.pem"
+```
 
-As suítes S1, S3 e S5 usam seus caminhos locais em memória/simulados e não
-precisam do broker compartilhado. I2 e I3 são executados pelo CLI documentado;
-seus testes comparam a saída real com os schemas da especificação 6c, portanto
-identificam divergências entre a implementação de cada repositório e o manual.
-P2 gera um pacote MODEL ONNX temporário e testa a compilação CPU e a inferência
-pela API pública; para executá-lo, instale `p2[cpu]` e `pytest` no ambiente
-Python usado pelo executor.
-S4 foi validado em Docker Debian: os 15 testes CTest passaram e o smoke E2E
-com vídeo real validou replay, buffer, API HTTP, decodificação H.264 e hashes
-repetíveis. O Dockerfile oferece todas as bibliotecas necessárias; no Windows,
-o script smoke precisou ser normalizado temporariamente de CRLF para LF porque
-o shebang com CRLF não é executável no Linux.
-I4 também tem um fluxo offline com vídeo e checkpoint locais; a suíte valida a
-saída real contra o evento `ods.i4.sign` do manual, sem simular publicação no
-barramento.
-I1 executa o detector ONNX real no serviço Docker `i1-degrau-a` e valida os
-eventos JSONL publicados contra `ods.i1.detections`; exige Docker Engine ativo,
-imagem construível e os artefatos/fixtures incluídos no repositório I1.
-I5 executa Whisper tiny em CPU com `i5/data/audio6.ogg`, quando o modelo já
-está no cache local; I7 executa YOLO e Fast-ALPR em CPU com checkpoint, fixture
-de imagem e modelo OCR locais. Esses testes não baixam modelos durante a
-execução. Em ambos, o teste valida a saída real contra o contrato do manual e
-registra como reprovada qualquer divergência, mesmo quando a inferência local
-funciona.
+Também é aceito `KAFKA_BOOTSTRAP_SERVERS`. Os tópicos de entrada e saída devem
+existir e as credenciais precisam de permissão de escrita/leitura. O executor não
+cria tópicos nem altera configurações do broker. `ODS_KAFKA_READY_TIMEOUT_SECONDS`
+e `ODS_KAFKA_REPLY_TIMEOUT_SECONDS` ajustam os tempos de espera (padrões: 30 e
+45 segundos).
 
-O plano de verificação por camada está em `docs/`. A execução operacional de
-componentes que dependem de artefatos, câmeras, microfones, toolchains ou
-serviços externos exige os pré-requisitos próprios descritos em cada componente.
+Por segurança, execute contra um broker/namespace de teste ou staging, nunca
+contra produção: os eventos sintéticos de I2/I9/S1 são publicados nos tópicos
+compartilhados e podem ser vistos por outros consumidores. O `source_id` do S1
+deve ser dedicado aos testes para evitar reset de sessão de uma câmera ativa.
+Os testes de comandos S2/S3/P6/P7/S6 usam entradas inválidas conhecidas e esperam
+replies de erro para evitar alterações de estado, criação de alertas, movimento
+do atuador ou síntese.
+
+### Cobertura
+
+O executor roda as suítes Kafka de I2, I9, P6, P7, S1, S2, S3, S4, S5 e S6. B2 e
+I3 são registrados como bloqueados: B2 usa MQTT e não tem contrato Kafka 6c; I3
+publica calibração, mas a especificação não define mensagem Kafka de entrada
+para iniciar uma calibração. I6 tem uma consulta no contrato, mas o runtime do
+workspace não expõe o handler Kafka correspondente. Componentes acionados por
+mídia/stream, como I1, I4, I5 e I7, também não podem ser iniciados por uma
+mensagem do barramento no contrato atual. Não se inventam comandos para esses
+componentes.
+
+Sem `ODS_KAFKA_BOOTSTRAP_SERVERS` ou `KAFKA_BOOTSTRAP_SERVERS`, ou sem
+`ODS_TEST_SOURCE_ID` para S1, as suítes dependentes são registradas como
+`BLOQUEADO`, não como aprovadas. O relatório
+`..\relatorio_integracao.csv` é atualizado pelo executor com resultados e
+bloqueios.
