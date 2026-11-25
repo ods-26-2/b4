@@ -12,10 +12,13 @@ Instale o cliente Kafka e configure o endereço do broker de testes:
 
 ```powershell
 python -m pip install -r requirements.txt
-$env:ODS_KAFKA_BOOTSTRAP_SERVERS = "<host:porta>"
+$env:ODS_KAFKA_BOOTSTRAP_SERVERS = "broker.example.com:9092"
 $env:ODS_TEST_SOURCE_ID = "<source_id de teste cadastrado no ZONES do S1>"
 python run_integration.py
 ```
+
+Substitua `broker.example.com:9092` pelo endereço real do broker, sem incluir
+`<` ou `>` (por exemplo, `34.66.235.91:9093`).
 
 Para Kafka gerenciado com SASL/TLS, configure as variáveis comuns usadas pela
 arquitetura:
@@ -57,5 +60,6 @@ componentes.
 Sem `ODS_KAFKA_BOOTSTRAP_SERVERS` ou `KAFKA_BOOTSTRAP_SERVERS`, ou sem
 `ODS_TEST_SOURCE_ID` para S1, as suítes dependentes são registradas como
 `BLOQUEADO`, não como aprovadas. O relatório
-`..\relatorio_integracao.csv` é atualizado pelo executor com resultados e
-bloqueios.
+`results/relatorio_integracao.csv`, na raiz do projeto, é atualizado pelo
+executor com resultados e bloqueios. O arquivo não é ignorado pelo Git, então
+pode ser versionado junto com as alterações do projeto.
