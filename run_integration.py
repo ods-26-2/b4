@@ -2,15 +2,21 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parent
 TEST_ROOT = ROOT / "tests" / "integration"
 MATRIX_PATH = TEST_ROOT / "component_matrix.json"
 REPORT_PATH = ROOT / "results" / "relatorio_integracao.csv"
+BROKERS = (
+    ("nuvem", "34.66.235.91:9093"),
+    ("jetson", "172.18.4.56:9093"),
+)
 
 
 class IntegrationResult(unittest.TextTestResult):
@@ -61,39 +67,104 @@ def _write_report(records: list[dict[str, str]]) -> None:
     with MATRIX_PATH.open(encoding="utf-8") as source:
         matrix = json.load(source)
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    by_component: dict[str, list[dict[str, str]]] = {}
+    by_broker_component: dict[str, dict[str, list[dict[str, str]]]] = {
+        broker_name: {} for broker_name, _ in BROKERS
+    }
     for record in records:
-        by_component.setdefault(record["component"], []).append(record)
+        by_broker_component[record["broker"]].setdefault(
+            record["component"], []
+        ).append(record)
 
     with REPORT_PATH.open("w", encoding="utf-8-sig", newline="") as destination:
         writer = csv.writer(destination, delimiter=";")
         writer.writerow(
-            ["Componente", "Teste / fluxo avaliado", "Resultado", "Interface avaliada", "Observações"]
+            [
+                "Barramento",
+                "Componente",
+                "Teste / fluxo avaliado",
+                "Resultado",
+                "Interface avaliada",
+                "Observações",
+            ]
         )
-        for item in matrix:
-            outcomes = by_component.get(item["component"], [])
-            if not outcomes:
-                writer.writerow(
-                    [
-                        item["component"],
-                        item["test"] or "—",
-                        item["status_without_test"],
-                        item["interface"],
-                        item["observation"],
-                    ]
+        for broker_name, _ in BROKERS:
+            for item in matrix:
+                outcomes = by_broker_component[broker_name].get(
+                    item["component"], []
                 )
-                continue
-            for outcome in outcomes:
-                detail = outcome["detail"] or item["observation"]
-                writer.writerow(
-                    [
-                        item["component"],
-                        outcome["test"],
-                        outcome["result"],
-                        item["interface"],
-                        detail,
-                    ]
-                )
+                if not outcomes:
+                    writer.writerow(
+                        [
+                            broker_name,
+                            item["component"],
+                            item["test"] or "—",
+                            item["status_without_test"],
+                            item["interface"],
+                            item["observation"],
+                        ]
+                    )
+                    continue
+                for outcome in outcomes:
+                    detail = outcome["detail"] or item["observation"]
+                    writer.writerow(
+                        [
+                            broker_name,
+                            item["component"],
+                            outcome["test"],
+                            outcome["result"],
+                            item["interface"],
+                            detail,
+                        ]
+                    )
+
+
+def _load_component_suite(kafka_components: tuple[str, ...]) -> unittest.TestSuite:
+    suite = unittest.TestSuite()
+    for component in kafka_components:
+        suite.addTests(
+            unittest.defaultTestLoader.discover(
+                str(TEST_ROOT / component),
+                pattern="test_*.py",
+                top_level_dir=str(ROOT),
+            )
+        )
+    return suite
+
+
+def _run_broker_suites(runner, suite_loader, kafka_components):
+    records = []
+    failed = False
+    for broker_name, bootstrap_servers in BROKERS:
+        print(
+            f"\n=== Barramento {broker_name}: {bootstrap_servers} ===",
+            flush=True,
+        )
+        with patch.dict(
+            os.environ,
+            {"ODS_KAFKA_BOOTSTRAP_SERVERS": bootstrap_servers},
+        ):
+            result = runner.run(suite_loader(kafka_components))
+        records.extend(
+            {**record, "broker": broker_name} for record in result.records
+        )
+        failed = failed or bool(result.failures or result.errors)
+    return records, failed
+
+
+def _run_local_tests(runner):
+    suite = unittest.TestSuite()
+    suite.addTests(
+        unittest.defaultTestLoader.loadTestsFromName(
+            "tests.integration.test_kafka_client"
+        )
+    )
+    suite.addTests(
+        unittest.defaultTestLoader.loadTestsFromName(
+            "tests.integration.test_run_integration"
+        )
+    )
+    result = runner.run(suite)
+    return result.records, bool(result.failures or result.errors)
 
 
 def main() -> int:
@@ -111,26 +182,17 @@ def main() -> int:
         "s5",
         "s6",
     )
-    suite = unittest.TestSuite()
-    for component in kafka_components:
-        suite.addTests(
-            unittest.defaultTestLoader.discover(
-                str(TEST_ROOT / component),
-                pattern="test_*.py",
-                top_level_dir=str(ROOT),
-            )
-        )
-    suite.addTests(unittest.defaultTestLoader.loadTestsFromName("tests.integration.test_kafka_client"))
-    suite.addTests(
-        unittest.defaultTestLoader.loadTestsFromName(
-            "tests.integration.test_run_integration"
-        )
-    )
     runner = unittest.TextTestRunner(verbosity=2, resultclass=IntegrationResult)
-    result = runner.run(suite)
-    _write_report(result.records)
+    records, failed = _run_broker_suites(
+        runner,
+        _load_component_suite,
+        kafka_components,
+    )
+    print("\n=== Testes locais do executor ===", flush=True)
+    _, local_tests_failed = _run_local_tests(runner)
+    _write_report(records)
     print(f"\nPlanilha atualizada: {REPORT_PATH}")
-    return 1 if result.failures or result.errors else 0
+    return 1 if failed or local_tests_failed else 0
 
 
 if __name__ == "__main__":
