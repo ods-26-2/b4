@@ -8,17 +8,18 @@ nem importados pelo executor de integração.
 
 ### Executar
 
-Instale o cliente Kafka e configure o endereço do broker de testes:
+Instale o cliente Kafka e configure, se necessário, as credenciais do Kafka:
 
 ```powershell
 python -m pip install -r requirements.txt
-$env:ODS_KAFKA_BOOTSTRAP_SERVERS = "broker.example.com:9092"
 $env:ODS_TEST_SOURCE_ID = "<source_id de teste cadastrado no ZONES do S1>"
 python run_integration.py
 ```
 
-Substitua `broker.example.com:9092` pelo endereço real do broker, sem incluir
-`<` ou `>` (por exemplo, `34.66.235.91:9093`).
+O executor roda a bateria completa primeiro no barramento `nuvem`
+(`34.66.235.91:9093`) e depois no `jetson` (`172.18.4.56:9093`). Os endereços
+são definidos no executor; as variáveis de segurança abaixo são compartilhadas
+pelos dois barramentos.
 
 Para Kafka gerenciado com SASL/TLS, configure as variáveis comuns usadas pela
 arquitetura:
@@ -32,14 +33,14 @@ $env:KAFKA_SASL_PASSWORD = "<senha>"
 $env:KAFKA_SSL_CA_LOCATION = "C:\certs\kafka-ca.pem"
 ```
 
-Também é aceito `KAFKA_BOOTSTRAP_SERVERS`. Os tópicos de entrada e saída devem
-existir e as credenciais precisam de permissão de escrita/leitura. O executor não
-cria tópicos nem altera configurações do broker. `ODS_KAFKA_READY_TIMEOUT_SECONDS`
-e `ODS_KAFKA_REPLY_TIMEOUT_SECONDS` ajustam os tempos de espera (padrões: 30 e
+Os tópicos de entrada e saída devem existir nos dois barramentos e as credenciais
+precisam de permissão de escrita/leitura em ambos. O executor não cria tópicos
+nem altera configurações dos brokers. `ODS_KAFKA_READY_TIMEOUT_SECONDS` e
+`ODS_KAFKA_REPLY_TIMEOUT_SECONDS` ajustam os tempos de espera (padrões: 30 e
 45 segundos).
 
-Por segurança, execute contra um broker/namespace de teste ou staging, nunca
-contra produção: os eventos sintéticos de I2/I9/S1 são publicados nos tópicos
+Por segurança, os dois brokers configurados devem ser de teste ou staging,
+nunca de produção: os eventos sintéticos de I2/I9/S1 são publicados nos tópicos
 compartilhados e podem ser vistos por outros consumidores. O `source_id` do S1
 deve ser dedicado aos testes para evitar reset de sessão de uma câmera ativa.
 Os testes de comandos S2/S3/P6/P7/S6 usam entradas inválidas conhecidas e esperam
@@ -57,9 +58,9 @@ mídia/stream, como I1, I4, I5 e I7, também não podem ser iniciados por uma
 mensagem do barramento no contrato atual. Não se inventam comandos para esses
 componentes.
 
-Sem `ODS_KAFKA_BOOTSTRAP_SERVERS` ou `KAFKA_BOOTSTRAP_SERVERS`, ou sem
-`ODS_TEST_SOURCE_ID` para S1, as suítes dependentes são registradas como
-`BLOQUEADO`, não como aprovadas. O relatório
-`results/relatorio_integracao.csv`, na raiz do projeto, é atualizado pelo
-executor com resultados e bloqueios. O arquivo não é ignorado pelo Git, então
-pode ser versionado junto com as alterações do projeto.
+Sem `ODS_TEST_SOURCE_ID`, o teste S1 é registrado como `BLOQUEADO` em ambos os
+barramentos. Os demais testes tentam conectar a cada broker e registram falhas
+de conexão/resposta. O relatório
+`results/relatorio_integracao.csv`, na raiz do projeto, inclui a coluna
+`Barramento` para distinguir os resultados de `nuvem` e `jetson`; o arquivo não
+é ignorado pelo Git e pode ser versionado junto com as alterações do projeto.
